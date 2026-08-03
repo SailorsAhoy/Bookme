@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// TENANT (Restaurant / Client)
+// ============================================================
+model Tenant {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique // used for subdomain: slug.yoursaas.com
+  customDomain      String?  @unique // e.g. bookings.clientrestaurant.com
+  status            TenantStatus @default(ACTIVE)
+  
+  // SaaS billing
+  stripeCustomerId  String?  @unique
+  stripeSubscriptionId String? @unique
+  plan              Plan     @default(TRIAL)
+  trialEndsAt       DateTime?
+  subscriptionEndsAt DateTime?
+
+  // Branding & settings (JSON for flexibility)
+  logoUrl           String?
+  primaryColor      String   @default("#0f766e") // teal-700
+  secondaryColor    String   @default("#134e4a")
+  fontFamily        String   @default("Inter")
+  businessInfo      Json?    // address, phone, email, opening hours, etc.
+  defaultLocale     String   @default("en")
+  enabledLocales    String[] @default(["en", "es", "it", "fr", "de"])
+  
+  // Booking settings
+  timezone          String   @default("Europe/Madrid")
+  minPartySize      Int      @default(1)
+  maxPartySize      Int      @default(20)
+  bookingLeadTimeMinutes Int @default(60) // how far in advance required
+  maxAdvanceDays    Int      @default(60)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  users             User[]
+  sections          Section[]
+  tables            Table[]
+  reservations      Reservation[]
+  settings          TenantSetting[]
+
+  @@index([slug])
+  @@index([customDomain])
+  @@index([status])
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  TRIAL
+}
+
+enum Plan {
+  TRIAL
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// ============================================================
+// USER (belongs to exactly one tenant)
+// ============================================================
+model User {
+  id            String   @id @default(cuid())
+  tenantId      String
+  email         String
+  passwordHash  String
+  name          String?
+  role          UserRole @default(STAFF)
+  isActive      Boolean  @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Unique email per tenant (same email can exist in different restaurants)
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+}
+
+enum UserRole {
+  OWNER       // full access + billing
+  ADMIN       // full operational access
+  STAFF       // reservations only
+  PLATFORM_ADMIN // SaaS provider only (special case)
+}
+
+// ============================================================
+// SECTIONS (Inside, Terrace, Sala 1, etc.)
+// ============================================================
+model Section {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  slug        String   // inside, terrace, sala-1
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  // Availability windows can be more complex later; for now simple flags
+  availableFrom Time?  // e.g. 12:00
+  availableTo   Time?  // e.g. 23:00
+  daysOfWeek  Int[]    @default([0,1,2,3,4,5,6]) // 0=Sun
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tables      Table[]
+  reservations Reservation[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+// ============================================================
+// TABLES
+// ============================================================
+model Table {
+  id          String   @id @default(cuid())
+  tenantId    String
+  sectionId   String
+  label       String   // e.g. "T1", "Window 3", "A12"
+  capacity    Int      // max pax
+  minCapacity Int      @default(1)
+  // Visual position for the floor plan (optional)
+  posX        Float?
+  posY        Float?
+  shape       TableShape @default(RECTANGLE)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@unique([tenantId, sectionId, label])
+  @@index([tenantId])
+  @@index([tenantId, sectionId])
+  @@index([tenantId, isActive])
+}
+
+enum TableShape {
+  RECTANGLE
+  ROUND
+  SQUARE
+  CUSTOM
+}
+
+// ============================================================
+// RESERVATIONS
+// ============================================================
+model Reservation {
+  id            String   @id @default(cuid())
+  tenantId      String
+  sectionId     String?
+  tableId       String?  // null = unassigned / waiting list
+
+  // Guest info
+  guestName     String
+  guestEmail    String?
+  guestPhone    String?
+  partySize     Int
+
+  // Timing
+  date          DateTime @db.Date
+  startTime     DateTime // full datetime for easier querying
+  endTime       DateTime
+  durationMinutes Int    @default(90)
+
+  status        ReservationStatus @default(PENDING)
+  source        String   @default("web") // web, phone, walk-in, admin
+  notes         String?
+  internalNotes String?
+
+  // Audit
+  createdById   String?
+  confirmedAt   DateTime?
+  cancelledAt   DateTime?
+  cancellationReason String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  section       Section? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  table         Table?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@index([tenantId, tableId, startTime, endTime])
+  @@index([tenantId, sectionId, date])
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ============================================================
+// FLEXIBLE SETTINGS (key-value per tenant)
+// ============================================================
+model TenantSetting {
+  id        String   @id @default(cuid())
+  tenantId  String
+  key       String
+  value     Json
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+EOF
