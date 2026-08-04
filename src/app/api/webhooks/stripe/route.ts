@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { sendWelcomeEmail } from "@/lib/email";
 import Stripe from "stripe";
 
 /**
@@ -136,8 +137,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   console.log(`✅ Created tenant ${slug} (${tenant.id}) for ${ownerEmail}`);
-  console.log(`   Temp password for first login: ${tempPassword}`);
-  // TODO: send welcome email with temp password or magic link
+
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  await sendWelcomeEmail({
+    to: ownerEmail,
+    restaurantName,
+    slug,
+    tempPassword,
+    loginUrl: `${baseUrl}/login`,
+  });
 }
 
 async function handleSubscriptionUpdated(sub: Stripe.Subscription) {

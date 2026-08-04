@@ -50,7 +50,15 @@ export async function createSectionAction(data: {
 
 export async function updateSectionAction(
   id: string,
-  data: Partial<{ name: string; description: string | null; isActive: boolean; sortOrder: number }>
+  data: Partial<{
+    name: string;
+    description: string | null;
+    isActive: boolean;
+    sortOrder: number;
+    availableFrom: string | null;
+    availableTo: string | null;
+    daysOfWeek: number[];
+  }>
 ) {
   try {
     await requireAdmin();
@@ -121,5 +129,41 @@ export async function deleteTableAction(id: string) {
   } catch (err: any) {
     console.error(err);
     return { error: err.message || "Failed to delete table" };
+  }
+}
+
+
+export async function openBillingPortalAction() {
+  try {
+    await requireAdmin();
+    // Call the portal API logic inline to avoid extra round-trip complexity from server action
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/lib/auth/options");
+    const { stripe } = await import("@/lib/stripe");
+    const { prisma } = await import("@/lib/prisma");
+
+    if (!stripe) return { error: "Stripe is not configured" };
+
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.tenantId) return { error: "Unauthorized" };
+    if (session.user.role !== "OWNER" && session.user.role !== "PLATFORM_ADMIN") {
+      return { error: "Only the owner can manage billing" };
+    }
+
+    const tenant = await prisma.tenant.findUnique({ where: { id: session.user.tenantId } });
+    if (!tenant?.stripeCustomerId) {
+      return { error: "No billing account found (one-off install or no subscription)" };
+    }
+
+    const origin = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: tenant.stripeCustomerId,
+      return_url: `${origin}/dashboard/settings`,
+    });
+
+    return { url: portalSession.url };
+  } catch (err: any) {
+    console.error(err);
+    return { error: err.message || "Failed to open billing portal" };
   }
 }

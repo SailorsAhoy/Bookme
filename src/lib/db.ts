@@ -41,10 +41,25 @@ export async function updateSection(
     description: string | null;
     isActive: boolean;
     sortOrder: number;
+    availableFrom: Date | string | null;
+    availableTo: Date | string | null;
+    daysOfWeek: number[];
   }>
 ) {
   const { db } = await getTenantDb();
-  return db.section.update({ where: { id }, data });
+  // Convert "HH:mm" strings to Date for Prisma Time fields
+  const payload: any = { ...data };
+  if (typeof data.availableFrom === "string") {
+    payload.availableFrom = data.availableFrom
+      ? new Date(`1970-01-01T${data.availableFrom}:00Z`)
+      : null;
+  }
+  if (typeof data.availableTo === "string") {
+    payload.availableTo = data.availableTo
+      ? new Date(`1970-01-01T${data.availableTo}:00Z`)
+      : null;
+  }
+  return db.section.update({ where: { id }, data: payload });
 }
 
 // ------------------------------------------------------------

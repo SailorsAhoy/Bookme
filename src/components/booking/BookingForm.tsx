@@ -3,16 +3,48 @@
 import { useState, useTransition } from "react";
 import { createPublicReservationAction } from "@/app/book/actions";
 
-type Section = { id: string; name: string };
+type Section = {
+  id: string;
+  name: string;
+  availableFrom: string | null;
+  availableTo: string | null;
+  daysOfWeek: number[];
+};
+
+type Labels = {
+  title: string;
+  name: string;
+  email: string;
+  phone: string;
+  partySize: string;
+  date: string;
+  time: string;
+  section: string;
+  noPreference: string;
+  notes: string;
+  submit: string;
+  successTitle: string;
+  successBody: string;
+  disclaimer: string;
+};
 
 type Props = {
   sections: Section[];
   minPartySize: number;
   maxPartySize: number;
   primaryColor: string;
+  labels: Labels;
 };
 
-export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor }: Props) {
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export function BookingForm({
+  sections,
+  minPartySize,
+  maxPartySize,
+  primaryColor,
+  labels,
+}: Props) {
   const [isPending, startTransition] = useTransition();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -23,7 +55,6 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
     partySize: number;
   } | null>(null);
 
-  // Form state
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
@@ -33,7 +64,6 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
   const [sectionId, setSectionId] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Min date = today
   const today = new Date().toISOString().slice(0, 10);
 
   function handleSubmit(e: React.FormEvent) {
@@ -56,12 +86,7 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
         return;
       }
 
-      setConfirmation({
-        guestName,
-        date,
-        time,
-        partySize,
-      });
+      setConfirmation({ guestName, date, time, partySize });
       setSuccess(true);
     });
   }
@@ -75,15 +100,13 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
         >
           ✓
         </div>
-        <h3 className="text-xl font-semibold text-slate-900 mb-2">Request received!</h3>
+        <h3 className="text-xl font-semibold text-slate-900 mb-2">{labels.successTitle}</h3>
         <p className="text-slate-600 mb-4">
-          Thank you, <strong>{confirmation.guestName}</strong>. We have received your
-          reservation request for <strong>{confirmation.partySize}</strong> people on{" "}
-          <strong>{confirmation.date}</strong> at <strong>{confirmation.time}</strong>.
-        </p>
-        <p className="text-sm text-slate-500">
-          The restaurant will confirm shortly. You will receive a confirmation if you provided
-          an email or phone number.
+          {labels.successBody
+            .replace("{name}", confirmation.guestName)
+            .replace("{partySize}", String(confirmation.partySize))
+            .replace("{date}", confirmation.date)
+            .replace("{time}", confirmation.time)}
         </p>
         <button
           onClick={() => {
@@ -96,11 +119,13 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
           }}
           className="mt-6 text-sm underline text-slate-600"
         >
-          Make another reservation
+          {labels.title}
         </button>
       </div>
     );
   }
+
+  const selectedSection = sections.find((s) => s.id === sectionId);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -111,42 +136,39 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
       )}
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">Your name *</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.name} *</label>
         <input
           required
           value={guestName}
           onChange={(e) => setGuestName(e.target.value)}
           className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-600"
-          placeholder="Full name"
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.email}</label>
           <input
             type="email"
             value={guestEmail}
             onChange={(e) => setGuestEmail(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-600"
-            placeholder="you@email.com"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.phone}</label>
           <input
             type="tel"
             value={guestPhone}
             onChange={(e) => setGuestPhone(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-600"
-            placeholder="+34 600 000 000"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Party size *</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.partySize} *</label>
           <select
             value={partySize}
             onChange={(e) => setPartySize(Number(e.target.value))}
@@ -155,14 +177,14 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
             {Array.from({ length: maxPartySize - minPartySize + 1 }, (_, i) => minPartySize + i).map(
               (n) => (
                 <option key={n} value={n}>
-                  {n} {n === 1 ? "person" : "people"}
+                  {n}
                 </option>
               )
             )}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Date *</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.date} *</label>
           <input
             type="date"
             required
@@ -173,7 +195,7 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Time *</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.time} *</label>
           <input
             type="time"
             required
@@ -186,32 +208,44 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
 
       {sections.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Preferred section (optional)
-          </label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.section}</label>
           <select
             value={sectionId}
             onChange={(e) => setSectionId(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300"
           >
-            <option value="">No preference</option>
+            <option value="">{labels.noPreference}</option>
             {sections.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
           </select>
+          {selectedSection && (selectedSection.availableFrom || selectedSection.daysOfWeek?.length < 7) && (
+            <p className="text-xs text-slate-500 mt-1.5">
+              {selectedSection.availableFrom && selectedSection.availableTo && (
+                <span>
+                  {selectedSection.availableFrom} – {selectedSection.availableTo}
+                </span>
+              )}
+              {selectedSection.daysOfWeek?.length > 0 && selectedSection.daysOfWeek.length < 7 && (
+                <span>
+                  {selectedSection.availableFrom ? " · " : ""}
+                  {selectedSection.daysOfWeek.map((d) => DAY_NAMES[d]).join(", ")}
+                </span>
+              )}
+            </p>
+          )}
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes (optional)</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">{labels.notes}</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300"
-          placeholder="Allergies, special occasion, high chair..."
         />
       </div>
 
@@ -221,12 +255,10 @@ export function BookingForm({ sections, minPartySize, maxPartySize, primaryColor
         className="w-full text-white font-medium py-3 rounded-lg transition disabled:opacity-60"
         style={{ backgroundColor: primaryColor }}
       >
-        {isPending ? "Sending…" : "Request reservation"}
+        {isPending ? "…" : labels.submit}
       </button>
 
-      <p className="text-xs text-slate-400 text-center">
-        Your request will be reviewed by the restaurant. This is not an instant confirmation.
-      </p>
+      <p className="text-xs text-slate-400 text-center">{labels.disclaimer}</p>
     </form>
   );
 }

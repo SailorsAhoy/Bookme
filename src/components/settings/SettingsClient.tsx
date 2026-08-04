@@ -9,6 +9,7 @@ import {
   createTableAction,
   updateTableAction,
   deleteTableAction,
+  openBillingPortalAction,
 } from "@/app/dashboard/settings/actions";
 
 type Settings = {
@@ -34,6 +35,9 @@ type Section = {
   description: string | null;
   isActive: boolean;
   sortOrder: number;
+  availableFrom: Date | string | null;
+  availableTo: Date | string | null;
+  daysOfWeek: number[];
   tables: {
     id: string;
     label: string;
@@ -44,6 +48,23 @@ type Section = {
     notes: string | null;
   }[];
 };
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function toHHMM(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  try {
+    const d = typeof value === "string" ? new Date(value) : value;
+    if (isNaN(d.getTime())) {
+      // maybe already "HH:mm"
+      const m = String(value).match(/(\d{2}):(\d{2})/);
+      return m ? `${m[1]}:${m[2]}` : "";
+    }
+    return d.toISOString().slice(11, 16);
+  } catch {
+    return "";
+  }
+}
 
 const FONTS = [
   "Inter",
@@ -175,6 +196,34 @@ export function SettingsClient({ settings, sections: initialSections }: Props) {
       if (result.error) showMsg("err", result.error);
       else {
         showMsg("ok", "Table deleted");
+        router.refresh();
+      }
+    });
+  }
+
+  function handleBilling() {
+    startTransition(async () => {
+      const result = await openBillingPortalAction();
+      if (result.error) showMsg("err", result.error);
+      else if (result.url) window.location.href = result.url;
+    });
+  }
+
+  function handleSaveAvailability(
+    sectionId: string,
+    availableFrom: string,
+    availableTo: string,
+    daysOfWeek: number[]
+  ) {
+    startTransition(async () => {
+      const result = await updateSectionAction(sectionId, {
+        availableFrom: availableFrom || null,
+        availableTo: availableTo || null,
+        daysOfWeek,
+      });
+      if (result.error) showMsg("err", result.error);
+      else {
+        showMsg("ok", "Availability saved");
         router.refresh();
       }
     });
@@ -354,13 +403,23 @@ export function SettingsClient({ settings, sections: initialSections }: Props) {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isPending}
-            className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-medium px-5 py-2.5 rounded-lg transition"
-          >
-            {isPending ? "Saving…" : "Save branding"}
-          </button>
+          <div className="flex flex-wrap gap-3 items-center">
+            <button
+              type="submit"
+              disabled={isPending}
+              className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-medium px-5 py-2.5 rounded-lg transition"
+            >
+              {isPending ? "Saving…" : "Save branding"}
+            </button>
+            <button
+              type="button"
+              onClick={handleBilling}
+              disabled={isPending}
+              className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg transition"
+            >
+              Manage billing
+            </button>
+          </div>
         </form>
       )}
 
@@ -415,6 +474,13 @@ export function SettingsClient({ settings, sections: initialSections }: Props) {
                   {section.isActive ? "Deactivate" : "Activate"}
                 </button>
               </div>
+
+              {/* Availability rules */}
+              <SectionAvailabilityEditor
+                section={section}
+                onSave={handleSaveAvailability}
+                disabled={isPending}
+              />
 
               {/* Tables */}
               <div className="space-y-2">
@@ -505,6 +571,83 @@ export function SettingsClient({ settings, sections: initialSections }: Props) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function SectionAvailabilityEditor({
+  section,
+  onSave,
+  disabled,
+}: {
+  section: Section;
+  onSave: (id: string, from: string, to: string, days: number[]) => void;
+  disabled: boolean;
+}) {
+  const [from, setFrom] = useState(toHHMM(section.availableFrom));
+  const [to, setTo] = useState(toHHMM(section.availableTo));
+  const [days, setDays] = useState<number[]>(
+    section.daysOfWeek?.length ? section.daysOfWeek : [0, 1, 2, 3, 4, 5, 6]
+  );
+
+  function toggleDay(d: number) {
+    setDays((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()
+    );
+  }
+
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-3">
+      <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+        Availability
+      </div>
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">From</label>
+          <input
+            type="time"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-slate-300 rounded"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">To</label>
+          <input
+            type="time"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-slate-300 rounded"
+          />
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {DAY_LABELS.map((label, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => toggleDay(i)}
+              className={`w-9 h-8 text-xs rounded border ${
+                days.includes(i)
+                  ? "bg-teal-700 text-white border-teal-700"
+                  : "bg-white text-slate-500 border-slate-300"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onSave(section.id, from, to, days)}
+          className="text-sm bg-slate-800 text-white px-3 py-1.5 rounded disabled:opacity-60"
+        >
+          Save hours
+        </button>
+      </div>
+      <p className="text-xs text-slate-400">
+        Leave times empty for all-day. Guests can only book within these rules when this section is selected.
+      </p>
     </div>
   );
 }
