@@ -10,14 +10,14 @@ import type { Prisma } from "@prisma/client";
 // ------------------------------------------------------------
 // Sections
 // ------------------------------------------------------------
-export async function listSections(opts?: { activeOnly?: boolean }) {
+export async function listSections(opts?: { activeOnly?: boolean; includeInactiveTables?: boolean }) {
   const { db } = await getTenantDb();
   return db.section.findMany({
     where: opts?.activeOnly ? { isActive: true } : undefined,
     orderBy: { sortOrder: "asc" },
     include: {
       tables: {
-        where: { isActive: true },
+        where: opts?.includeInactiveTables ? undefined : { isActive: true },
         orderBy: { sortOrder: "asc" },
       },
     },
