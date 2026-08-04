@@ -15,6 +15,9 @@ const PUBLIC_PATHS = [
   "/api/webhooks",
   "/api/health",
   "/book",
+  "/pricing",
+  "/signup",
+  "/api/stripe",
 ];
 
 export async function middleware(request: NextRequest) {
