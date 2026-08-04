@@ -17,6 +17,10 @@ Sell as a **one-time self-hosted install** or run as **SaaS** with Stripe billin
 | Docker + docker-compose (one-off ready) | ✅ |
 | Stripe SaaS subscriptions | ⏳ next |
 
+## Deploy a real client
+
+See **[DEPLOY.md](./DEPLOY.md)** for a full checklist (one-off VPS install + SaaS).
+
 ## Quick start (development)
 
 ```bash
