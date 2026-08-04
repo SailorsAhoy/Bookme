@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    // Enable if you later add server actions heavily
-  },
+  output: "standalone",
   // Important for multi-tenant custom domains later
   async headers() {
     return [

@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bookme
+      POSTGRES_PASSWORD: bookme_secret
+      POSTGRES_DB: bookme
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bookme"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://bookme:bookme_secret@db:5432/bookme?schema=public"
+      NEXTAUTH_URL: "http://localhost:3000"
+      NEXTAUTH_SECRET: "change-me-in-production-to-a-long-random-string"
+      # One-off install mode (set to your restaurant slug after seeding)
+      SINGLE_TENANT_SLUG: "la-terraza"
+      # Or for SaaS multi-tenant:
+      # ROOT_DOMAIN: "yoursaas.com"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

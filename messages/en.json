@@ -1,0 +1,43 @@
+{
+  "common": {
+    "appName": "Bookme",
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "signIn": "Sign in",
+    "signOut": "Sign out"
+  },
+  "booking": {
+    "title": "Make a reservation",
+    "name": "Your name",
+    "email": "Email",
+    "phone": "Phone",
+    "partySize": "Party size",
+    "date": "Date",
+    "time": "Time",
+    "section": "Preferred section",
+    "noPreference": "No preference",
+    "notes": "Notes (optional)",
+    "submit": "Request reservation",
+    "successTitle": "Request received!",
+    "successBody": "Thank you, {name}. We have received your reservation request for {partySize} people on {date} at {time}.",
+    "disclaimer": "Your request will be reviewed by the restaurant. This is not an instant confirmation."
+  },
+  "dashboard": {
+    "welcome": "Welcome back",
+    "reservations": "Reservations",
+    "floorPlan": "Floor Plan",
+    "settings": "Settings"
+  },
+  "floorPlan": {
+    "title": "Floor Plan",
+    "free": "Free",
+    "occupied": "Occupied",
+    "unassigned": "Unassigned",
+    "assigned": "Assigned",
+    "selectFirst": "Select a reservation from the list first, then click a table to assign it."
+  }
+}

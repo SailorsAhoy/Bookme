@@ -1,103 +1,99 @@
-# Restaurant Booking Platform
+# Bookme – Multi-tenant Restaurant Booking Platform
 
-Multi-tenant restaurant table booking system.  
-Sell as a **one-time self-hosted install** or run as a **SaaS** with Stripe billing.
+Sell as a **one-time self-hosted install** or run as **SaaS** with Stripe billing.
 
-## Tenant Isolation (Core Design)
+## Features (current)
 
-Every piece of restaurant data is strictly isolated by `tenantId`.
+| Feature | Status |
+|---------|--------|
+| Strong tenant isolation (`tenantId` on every model + auto-scoped Prisma client) | ✅ |
+| Auth (NextAuth credentials, roles: OWNER / ADMIN / STAFF) | ✅ |
+| Visual Floor Plan (red/green tables, date/section filters, click-to-assign) | ✅ |
+| Admin Settings (logo, colors, fonts, business info) | ✅ |
+| Sections & Tables CRUD | ✅ |
+| Public booking page (`/book`) with branding | ✅ |
+| Reservations list + status management | ✅ |
+| Multi-language message files (en / es) | ✅ foundation |
+| Docker + docker-compose (one-off ready) | ✅ |
+| Stripe SaaS subscriptions | ⏳ next |
 
-### How isolation works
-
-1. **Tenant resolution** (happens on every request)
-   - Custom domain → `bookings.clientrestaurant.com`
-   - Subdomain → `client.yoursaas.com`
-   - Header → `x-tenant-slug` / `x-tenant-id` (API & testing)
-   - Single-tenant mode → `SINGLE_TENANT_SLUG` env var (one-off installs)
-
-2. **Automatic query scoping**
-   ```ts
-   const { tenant, db } = await getTenantDb();
-   // db is a Prisma client extension that injects tenantId into EVERY query
-   await db.reservation.findMany(...); // already filtered
-   ```
-
-3. **Never use raw `prisma` for tenant data**
-   - Only the platform/SaaS owner uses `getPlatformDb()` / raw `prisma`
-   - Application code always goes through `getTenantDb()` or the helpers in `src/lib/db.ts`
-
-4. **Users belong to one tenant**
-   - `@@unique([tenantId, email])` – same email can exist in different restaurants
-   - Role `PLATFORM_ADMIN` is the only exception (SaaS support)
-
-### Environment variables
-
-```env
-# Database
-DATABASE_URL="postgresql://..."
-
-# Multi-tenant SaaS
-ROOT_DOMAIN="yoursaas.com"          # enables subdomain routing
-
-# One-off self-hosted install
-SINGLE_TENANT_SLUG="my-restaurant"  # forces a single tenant
-
-# Stripe (SaaS only)
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_PRICE_STARTER=
-STRIPE_PRICE_PROFESSIONAL=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-
-# Auth
-NEXTAUTH_SECRET=
-NEXTAUTH_URL=
-```
-
-### Deployment modes
-
-| Mode              | How tenant is resolved              | Typical use case          |
-|-------------------|-------------------------------------|---------------------------|
-| SaaS multi-tenant | subdomain or custom domain          | You host many restaurants |
-| One-off install   | `SINGLE_TENANT_SLUG`                | Client pays once, self-hosts |
-| Development       | `x-tenant-slug` header or single slug | Local testing             |
-
-### Safety guarantees
-
-- Prisma client extension rejects any operation that would leak data across tenants
-- Middleware + `requireTenant()` ensure no request proceeds without a valid active tenant
-- Cascade deletes: removing a tenant removes all its users, sections, tables, reservations
-- File uploads (future) will be stored under `/uploads/{tenantId}/...`
-
-## Getting started
+## Quick start (development)
 
 ```bash
 cp .env.example .env
+# Edit DATABASE_URL, NEXTAUTH_SECRET, SINGLE_TENANT_SLUG
+
 npm install
 npx prisma db push
-npx prisma db seed   # creates a demo tenant
+npx prisma db seed          # creates two demo restaurants
 npm run dev
 ```
+
+Demo logins (after seed):
+- `owner@laterraza.cat` / `password123`  (La Terraza)
+- `owner@bellavista.it` / `password123`  (Bella Vista)
+
+Set `SINGLE_TENANT_SLUG=la-terraza` (or `bella-vista`) in `.env` for local single-tenant mode.
+
+## One-off install (Docker)
+
+```bash
+# 1. Clone & configure
+cp .env.example .env
+# Set SINGLE_TENANT_SLUG and a strong NEXTAUTH_SECRET
+
+# 2. Start
+docker compose up -d --build
+
+# 3. Run migrations + seed (first time)
+docker compose exec app npx prisma db push
+docker compose exec app npx tsx prisma/seed.ts
+```
+
+Point the client’s domain to the server (or use the VPS IP).  
+Each paid client gets their own deployment (or you run multi-tenant SaaS mode with `ROOT_DOMAIN`).
+
+## Tenant isolation
+
+Every request resolves a tenant via:
+
+1. `x-tenant-slug` / `x-tenant-id` header  
+2. Custom domain  
+3. Subdomain (`client.yoursaas.com`)  
+4. `SINGLE_TENANT_SLUG` env (one-off installs)
+
+All Prisma queries are automatically scoped by a client extension.  
+Never use the raw `prisma` client for tenant data in application code.
 
 ## Project structure
 
 ```
 src/
   lib/
-    tenant.ts     ← tenant resolution + Prisma extension (isolation core)
-    db.ts         ← all business data access (always tenant-scoped)
-    prisma.ts     ← raw client (platform use only)
-  middleware.ts   ← early tenant context injection
+    tenant.ts      ← resolution + Prisma extension (isolation core)
+    db.ts          ← all business data access (always tenant-scoped)
+    auth/          ← NextAuth + session helpers
+  app/
+    book/          ← public reservation form
+    dashboard/     ← staff area (floor-plan, reservations, settings)
+    (auth)/login/
 prisma/
-  schema.prisma   ← every model has tenantId
+  schema.prisma
+  seed.ts
+messages/          ← i18n (en, es)
+docker-compose.yml
+Dockerfile
 ```
 
-## Next steps in this codebase
+## Roadmap
 
-- Auth (NextAuth + tenant-aware sessions)
-- Visual floor-plan dashboard (red/green tables)
-- Admin branding UI (logo, colors, fonts)
-- Stripe subscription lifecycle
-- Public booking widget
-- Multi-language (next-intl)
-```
+- [ ] Full next-intl integration + locale switcher
+- [ ] Stripe subscription lifecycle (create tenant on payment)
+- [ ] Email / SMS confirmations
+- [ ] Drag-and-drop table reordering on floor plan
+- [ ] Opening hours & availability rules per section
+- [ ] Guest-facing booking widget (embeddable)
+
+## License
+
+GPL-3.0 (see LICENSE)

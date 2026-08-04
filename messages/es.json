@@ -1,0 +1,43 @@
+{
+  "common": {
+    "appName": "Bookme",
+    "loading": "Cargando…",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "back": "Volver",
+    "signIn": "Iniciar sesión",
+    "signOut": "Cerrar sesión"
+  },
+  "booking": {
+    "title": "Hacer una reserva",
+    "name": "Tu nombre",
+    "email": "Email",
+    "phone": "Teléfono",
+    "partySize": "Número de personas",
+    "date": "Fecha",
+    "time": "Hora",
+    "section": "Sección preferida",
+    "noPreference": "Sin preferencia",
+    "notes": "Notas (opcional)",
+    "submit": "Solicitar reserva",
+    "successTitle": "¡Solicitud recibida!",
+    "successBody": "Gracias, {name}. Hemos recibido tu solicitud de reserva para {partySize} personas el {date} a las {time}.",
+    "disclaimer": "Tu solicitud será revisada por el restaurante. Esto no es una confirmación inmediata."
+  },
+  "dashboard": {
+    "welcome": "Bienvenido de nuevo",
+    "reservations": "Reservas",
+    "floorPlan": "Plano de mesas",
+    "settings": "Configuración"
+  },
+  "floorPlan": {
+    "title": "Plano de mesas",
+    "free": "Libre",
+    "occupied": "Ocupada",
+    "unassigned": "Sin asignar",
+    "assigned": "Asignadas",
+    "selectFirst": "Selecciona primero una reserva de la lista y luego haz clic en una mesa para asignarla."
+  }
+}
